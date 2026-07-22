@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <list>
 #include <map>
+#include <vector>
+
+#include "celebrant/expected.hpp"
 
 namespace celebrant {
 
@@ -74,5 +77,7 @@ struct Trade {
     Quantity quantity;
     Quantity resting_remaining;
 };
+
+using Outcome = Expected<std::vector<Trade>, RejectReason>;
 
 } // namespace celebrant
