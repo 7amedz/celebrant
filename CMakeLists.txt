@@ -12,5 +12,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # compile_commands.json for clangd / clang-tidy
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# the engine's headers; targets that link this get include/ on their path
+add_library(celebrant INTERFACE)
+target_include_directories(celebrant INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 enable_testing()
 add_subdirectory(test)
