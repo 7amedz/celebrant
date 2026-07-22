@@ -67,4 +67,12 @@ struct OrderKey {
     auto operator<=>(const OrderKey&) const = default;
 };
 
+struct Trade {
+    OrderKey aggressor;
+    OrderKey resting;
+    Price price;
+    Quantity quantity;
+    Quantity resting_remaining;
+};
+
 } // namespace celebrant
