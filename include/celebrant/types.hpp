@@ -1,5 +1,6 @@
 #pragma once
 
+#include <compare> //for std::strong_ordering in spaceship operator
 #include <cstdint>
 #include <list>
 #include <map>
@@ -21,6 +22,7 @@ enum class OrderType : std::uint8_t {
     Market,
 };
 
+// resting order
 struct Order {
     OrderId id;
     Side side;
@@ -28,6 +30,17 @@ struct Order {
     Quantity remaining;
     SessionId session;
 };
+
+// New incoming order
+struct NewOrder {
+    OrderId id;
+    Side side;
+    Price price;
+    Quantity quantity;
+    SessionId session;
+    OrderType type;
+};
+
 struct Level {
     std::list<Order> orders;
     Quantity aggregate;
@@ -43,6 +56,15 @@ enum class RejectReason : std::uint8_t {
     UnknownOrder,
     InvalidQuantity,
     InvalidPrice,
+};
+
+struct OrderKey {
+    SessionId session;
+    OrderId id;
+
+    // spaceship operator (defining operations <,==,>,>=,<=) to make OrderKey a valid map key
+    // default: compares field by field
+    auto operator<=>(const OrderKey&) const = default;
 };
 
 } // namespace celebrant
