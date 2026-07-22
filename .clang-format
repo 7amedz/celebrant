@@ -1,0 +1,39 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+Standard: c++20
+
+ColumnLimit: 100
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+DerivePointerAlignment: false
+
+BreakBeforeBraces: Attach
+NamespaceIndentation: None
+
+# Keep bodies expanded: one statement per line, predictable breakpoints.
+# (Empty {} bodies may still collapse.)
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  # C++ standard library: <vector>, <cstdint>
+  - Regex: '^<[^/.]+>$'
+    Priority: 1
+  # Third-party: <gtest/gtest.h>, <boost/asio.hpp>
+  - Regex: '^<.*/.*>$'
+    Priority: 2
+  # Our own public headers
+  - Regex: '^<celebrant/'
+    Priority: 3
+  - Regex: '.*'
+    Priority: 4
+...
