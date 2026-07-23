@@ -79,5 +79,6 @@ struct Trade {
 };
 
 using Outcome = Expected<std::vector<Trade>, RejectReason>;
+using CancelOutcome = Expected<Quantity, RejectReason>;
 
 } // namespace celebrant
