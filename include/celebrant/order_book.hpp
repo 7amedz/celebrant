@@ -15,6 +15,7 @@ class OrderBook {
     [[nodiscard]] Outcome process(NewOrder new_order);
 
   private:
+    Quantity remove_resting(Handle h);
     std::map<Price, Level> bids_;
     std::map<Price, Level> asks_;
     std::map<OrderKey, Handle> index_;
