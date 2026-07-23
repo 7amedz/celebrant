@@ -46,11 +46,13 @@ struct NewOrder {
 
 struct Level {
     std::list<Order> orders;
-    Quantity aggregate;
+    Quantity aggregate = 0;
 };
 
+using BookSide = std::map<Price, Level>;
+
 struct Handle {
-    std::map<Price, Level>::iterator level_it;
+    BookSide::iterator level_it;
     std::list<Order>::iterator it;
 };
 

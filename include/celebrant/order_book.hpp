@@ -16,8 +16,11 @@ class OrderBook {
 
   private:
     Quantity remove_resting(Handle h);
-    std::map<Price, Level> bids_;
-    std::map<Price, Level> asks_;
+    static bool price_acceptable(const NewOrder& new_order, Price best);
+    static BookSide::iterator best_level(BookSide& resting_side, Side aggressor_side);
+    BookSide bids_;
+    BookSide asks_;
     std::map<OrderKey, Handle> index_;
 };
 } // namespace celebrant
+//
