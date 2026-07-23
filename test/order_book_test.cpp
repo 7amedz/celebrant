@@ -5,6 +5,7 @@
 #include "celebrant/order_book.hpp"
 #include "celebrant/types.hpp"
 
+// buy meets a sell of equal qty: one trade, both fully gone
 TEST(Match, FullFillEqualOrder) {
     celebrant::OrderBook book;
     celebrant::NewOrder order1 = {
@@ -44,6 +45,7 @@ TEST(Match, FullFillEqualOrder) {
     EXPECT_EQ(agg_cancel.error(), celebrant::RejectReason::UnknownOrder);
 }
 
+// cancel the middle order, the other two keep their queue order
 TEST(Cancel, CancelMidQueue) {
     celebrant::OrderBook book;
     celebrant::NewOrder order1 = {
@@ -106,6 +108,7 @@ TEST(Cancel, CancelMidQueue) {
     EXPECT_EQ(buy_outcome.value()[1].aggressor.id, buy.id);
 }
 
+// market buy sweeps several resting orders. One trade each
 TEST(Match, AggressorSweep) {
     celebrant::OrderBook book;
     celebrant::NewOrder sell1 = {
@@ -174,6 +177,7 @@ TEST(Match, AggressorSweep) {
     EXPECT_EQ(out.value()[3].quantity, sell4.quantity);
 }
 
+// buy bigger than the resting order. Remaining rests
 TEST(Match, AggressorRests) {
     celebrant::OrderBook book;
     celebrant::NewOrder sell = {
@@ -207,6 +211,7 @@ TEST(Match, AggressorRests) {
     EXPECT_EQ(residual_cancel.value(), 5);
 }
 
+// buy smaller than resting: buy done, resting stays with the remaining
 TEST(Match, AggressorGetsFilledRestingStays) {
     celebrant::OrderBook book;
     celebrant::NewOrder sell = {
@@ -245,6 +250,7 @@ TEST(Match, AggressorGetsFilledRestingStays) {
     EXPECT_EQ(agg_cancel.error(), celebrant::RejectReason::UnknownOrder);
 }
 
+// buy priced below the best ask, no cross, it just rests
 TEST(Match, AggressorBuyPriceLessThanBestAsk) {
     celebrant::OrderBook book;
     celebrant::NewOrder sell = {
@@ -275,6 +281,7 @@ TEST(Match, AggressorBuyPriceLessThanBestAsk) {
     EXPECT_EQ(rest_cancel.value(), buy.quantity);
 }
 
+// market buy with no sell resting: no trade. dropped
 TEST(Match, MarketBuyEmptyBook) {
     celebrant::OrderBook book;
     celebrant::NewOrder buy = {
@@ -294,6 +301,7 @@ TEST(Match, MarketBuyEmptyBook) {
     EXPECT_EQ(cancel_out.error(), celebrant::RejectReason::UnknownOrder);
 }
 
+// market buy fills what it can. Rest is dropped
 TEST(Match, MarketPartialThenCancelled) {
     celebrant::OrderBook book;
     celebrant::NewOrder sell = {
@@ -324,4 +332,218 @@ TEST(Match, MarketPartialThenCancelled) {
     auto cancel_out = book.cancel({.session = buy.session, .id = buy.id});
     ASSERT_FALSE(cancel_out.has_value());
     EXPECT_EQ(cancel_out.error(), celebrant::RejectReason::UnknownOrder);
+}
+
+// two sells same price, the one that rested first fills first
+TEST(Priority, TimePriorityTest) {
+    celebrant::OrderBook book;
+    celebrant::NewOrder sellA = {
+        .id = 1,
+        .side = celebrant::Side::Sell,
+        .price = 100,
+        .quantity = 10,
+        .session = 1,
+        .type = celebrant::OrderType::Limit,
+    };
+    celebrant::NewOrder sellB = {
+        .id = 2,
+        .side = celebrant::Side::Sell,
+        .price = 100,
+        .quantity = 10,
+        .session = 2,
+        .type = celebrant::OrderType::Limit,
+    };
+    book.process(sellA);
+    book.process(sellB);
+
+    celebrant::NewOrder buy = {
+        .id = 3,
+        .side = celebrant::Side::Buy,
+        .price = 100,
+        .quantity = 10,
+        .session = 3,
+        .type = celebrant::OrderType::Limit,
+    };
+    auto out = book.process(buy);
+    ASSERT_TRUE(out.has_value());
+    ASSERT_EQ(out.value().size(), 1);
+    EXPECT_EQ(out.value()[0].resting.id, sellA.id);
+
+    auto b_cancel = book.cancel({.session = sellB.session, .id = sellB.id});
+    ASSERT_TRUE(b_cancel.has_value());
+    EXPECT_EQ(b_cancel.value(), 10);
+}
+
+// better priced order fills first even though it came after
+TEST(Priority, PricePriority) {
+    celebrant::OrderBook book;
+    celebrant::NewOrder sellHigh = {
+        .id = 1,
+        .side = celebrant::Side::Sell,
+        .price = 101,
+        .quantity = 10,
+        .session = 1,
+        .type = celebrant::OrderType::Limit,
+    };
+    celebrant::NewOrder sellLow = {
+        .id = 2,
+        .side = celebrant::Side::Sell,
+        .price = 100,
+        .quantity = 10,
+        .session = 2,
+        .type = celebrant::OrderType::Limit,
+    };
+    book.process(sellHigh);
+    book.process(sellLow);
+
+    celebrant::NewOrder buy = {
+        .id = 3,
+        .side = celebrant::Side::Buy,
+        .price = 101,
+        .quantity = 10,
+        .session = 3,
+        .type = celebrant::OrderType::Limit,
+    };
+    auto out = book.process(buy);
+    ASSERT_TRUE(out.has_value());
+    ASSERT_EQ(out.value().size(), 1);
+    EXPECT_EQ(out.value()[0].resting.id, sellLow.id);
+    EXPECT_EQ(out.value()[0].price, sellLow.price);
+}
+
+// cancel a resting order, a second cancel misses it
+TEST(Cancel, CancelRestingOrder) {
+    celebrant::OrderBook book;
+    celebrant::NewOrder sell = {
+        .id = 1,
+        .side = celebrant::Side::Sell,
+        .price = 100,
+        .quantity = 10,
+        .session = 1,
+        .type = celebrant::OrderType::Limit,
+    };
+    book.process(sell);
+
+    auto cancel_out = book.cancel({.session = sell.session, .id = sell.id});
+    ASSERT_TRUE(cancel_out.has_value());
+    EXPECT_EQ(cancel_out.value(), 10);
+
+    auto second_cancel = book.cancel({.session = sell.session, .id = sell.id});
+    ASSERT_FALSE(second_cancel.has_value());
+    EXPECT_EQ(second_cancel.error(), celebrant::RejectReason::UnknownOrder);
+}
+
+// cancel the only order at a price -> that whole level is gone
+TEST(Cancel, CancelLastOrderErasesLevel) {
+    celebrant::OrderBook book;
+    celebrant::NewOrder sell = {
+        .id = 1,
+        .side = celebrant::Side::Sell,
+        .price = 100,
+        .quantity = 10,
+        .session = 1,
+        .type = celebrant::OrderType::Limit,
+    };
+    book.process(sell);
+
+    auto cancel_out = book.cancel({.session = sell.session, .id = sell.id});
+    ASSERT_TRUE(cancel_out.has_value());
+
+    celebrant::NewOrder buy = {
+        .id = 2,
+        .side = celebrant::Side::Buy,
+        .price = 100,
+        .quantity = 10,
+        .session = 2,
+        .type = celebrant::OrderType::Limit,
+    };
+    auto out = book.process(buy);
+    ASSERT_TRUE(out.has_value());
+    EXPECT_EQ(out.value().size(), 0);
+}
+
+// cancel a partly filled order, the remaining is removed
+TEST(Cancel, CancelPartiallyFilled) {
+    celebrant::OrderBook book;
+    celebrant::NewOrder sell = {
+        .id = 1,
+        .side = celebrant::Side::Sell,
+        .price = 100,
+        .quantity = 10,
+        .session = 1,
+        .type = celebrant::OrderType::Limit,
+    };
+    book.process(sell);
+
+    celebrant::NewOrder buy = {
+        .id = 2,
+        .side = celebrant::Side::Buy,
+        .price = 100,
+        .quantity = 4,
+        .session = 2,
+        .type = celebrant::OrderType::Limit,
+    };
+    book.process(buy);
+
+    auto cancel_out = book.cancel({.session = sell.session, .id = sell.id});
+    ASSERT_TRUE(cancel_out.has_value());
+    EXPECT_EQ(cancel_out.value(), 6);
+}
+
+// cancel an id that was never placed: unknown order
+TEST(Cancel, CancelUnknownId) {
+    celebrant::OrderBook book;
+    auto cancel_out = book.cancel({.session = 1, .id = 99});
+    ASSERT_FALSE(cancel_out.has_value());
+    EXPECT_EQ(cancel_out.error(), celebrant::RejectReason::UnknownOrder);
+}
+
+// cancel an order that already fully filled: unknown order
+TEST(Cancel, CancelFullyFilled) {
+    celebrant::OrderBook book;
+    celebrant::NewOrder sell = {
+        .id = 1,
+        .side = celebrant::Side::Sell,
+        .price = 100,
+        .quantity = 10,
+        .session = 1,
+        .type = celebrant::OrderType::Limit,
+    };
+    book.process(sell);
+
+    celebrant::NewOrder buy = {
+        .id = 2,
+        .side = celebrant::Side::Buy,
+        .price = 100,
+        .quantity = 10,
+        .session = 2,
+        .type = celebrant::OrderType::Limit,
+    };
+    book.process(buy);
+
+    auto cancel_out = book.cancel({.session = sell.session, .id = sell.id});
+    ASSERT_FALSE(cancel_out.has_value());
+    EXPECT_EQ(cancel_out.error(), celebrant::RejectReason::UnknownOrder);
+}
+
+// wrong session cannot cancel someone else's order
+TEST(Cancel, CancelWrongSession) {
+    celebrant::OrderBook book;
+    celebrant::NewOrder sell = {
+        .id = 5,
+        .side = celebrant::Side::Sell,
+        .price = 100,
+        .quantity = 10,
+        .session = 1,
+        .type = celebrant::OrderType::Limit,
+    };
+    book.process(sell);
+
+    auto wrong = book.cancel({.session = 2, .id = 5});
+    ASSERT_FALSE(wrong.has_value());
+    EXPECT_EQ(wrong.error(), celebrant::RejectReason::UnknownOrder);
+
+    auto right = book.cancel({.session = 1, .id = 5});
+    ASSERT_TRUE(right.has_value());
+    EXPECT_EQ(right.value(), 10);
 }
