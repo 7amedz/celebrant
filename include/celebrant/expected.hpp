@@ -13,10 +13,10 @@ template <typename T, typename E> class Expected {
     [[nodiscard]] bool has_value() const {
         return has_value_;
     }
-    const T& value() const {
+    [[nodiscard]] const T& value() const {
         return value_;
     }
-    const E& error() const {
+    [[nodiscard]] const E& error() const {
         return error_;
     }
 

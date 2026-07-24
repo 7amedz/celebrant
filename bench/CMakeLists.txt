@@ -1,0 +1,2 @@
+add_executable(celebrant_bench benchmark.cpp)
+target_link_libraries(celebrant_bench PRIVATE celebrant)

@@ -18,3 +18,4 @@ target_include_directories(celebrant PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 enable_testing()
 add_subdirectory(test)
+add_subdirectory(bench)
