@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <unordered_map>
 
 #include "celebrant/types.hpp"
 
@@ -20,7 +21,7 @@ class OrderBook {
     static BookSide::iterator best_level(BookSide& resting_side, Side aggressor_side);
     BookSide bids_;
     BookSide asks_;
-    std::map<OrderKey, Handle> index_;
+    std::unordered_map<OrderKey, Handle> index_;
 };
 } // namespace celebrant
 //

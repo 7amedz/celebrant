@@ -2,6 +2,7 @@
 
 #include <compare> //for std::strong_ordering in spaceship operator
 #include <cstdint>
+#include <functional> // for std::hash
 #include <list>
 #include <map>
 #include <vector>
@@ -84,3 +85,11 @@ using Outcome = Expected<std::vector<Trade>, RejectReason>;
 using CancelOutcome = Expected<Quantity, RejectReason>;
 
 } // namespace celebrant
+
+template <> struct std::hash<celebrant::OrderKey> {
+    std::size_t operator()(const celebrant::OrderKey& k) const noexcept {
+        std::size_t h = std::hash<celebrant::SessionId>{}(k.session);
+        h ^= std::hash<celebrant::OrderId>{}(k.id) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        return h;
+    }
+};
