@@ -50,6 +50,61 @@ Expected<Side, ParseRejectReason> parse_side(std::string_view field) {
     return ParseRejectReason::UnknownSide;
 }
 
+Expected<Price, ParseRejectReason> parse_price(std::string_view field) {
+    Price price = 0;
+
+    size_t delimiter = field.find('.'); // look for dot
+    //
+    if (delimiter == std::string_view::npos) { // if no dot
+
+        auto parsed_price = parse_number<Price>(field);
+        if (parsed_price.has_value()) {
+            if (parsed_price.value() > (INT64_MAX / 100)) {
+
+                return ParseRejectReason::NumberOutOfRange;
+            }
+            price = 100 * parsed_price.value();
+            return price;
+        }
+        return parsed_price.error();
+    }
+
+    std::string_view pre_dot = field.substr(0, delimiter);
+    Price left = 0;
+    auto parsed_pre_dot = parse_number<Price>(pre_dot);
+    if (parsed_pre_dot.has_value()) {
+
+        if (parsed_pre_dot.value() > ((INT64_MAX / 100) - 100)) {
+
+            return ParseRejectReason::NumberOutOfRange;
+        }
+        left = 100 * parsed_pre_dot.value();
+    } else {
+
+        return parsed_pre_dot.error();
+    }
+
+    field.remove_prefix(delimiter + 1); // moves internal ptr after dot
+    Price right = 0;
+    auto parsed_post_dot = parse_number<Price>(field);
+    if (parsed_post_dot.has_value()) {
+        size_t post_dot_digits = field.size();
+        if (post_dot_digits > 2) {
+            return ParseRejectReason::ExcessPricePrecision;
+        }
+        if (post_dot_digits == 1) {
+            right = 10 * parsed_post_dot.value();
+        } else {
+
+            right = parsed_post_dot.value();
+        }
+    } else {
+        return parsed_post_dot.error();
+    }
+    price = left + right;
+    return price;
+}
+
 DecodeOutcome decode(std::string_view line, SessionId session) {
 
     std::vector<std::string_view> fields;

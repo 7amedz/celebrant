@@ -18,6 +18,7 @@ enum class ParseRejectReason : std::uint8_t {
     NumberOutOfRange,
     UnknownSide,
     UnknownOrderType,
+    ExcessPricePrecision,
 };
 
 struct ParseError {
