@@ -3,7 +3,9 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
@@ -133,6 +135,8 @@ DecodeOutcome decode(std::string_view line, SessionId session) {
         if (field_count < 5)
             return ParseError{.reason = ParseRejectReason::WrongFieldCount, .id = id};
 
+        Symbol symbol = std::string(fields[2]);
+
         OrderType type;
         auto type_parse = parse_order_type(fields[4]);
         if (type_parse.has_value()) {
@@ -186,7 +190,8 @@ DecodeOutcome decode(std::string_view line, SessionId session) {
                            .price = price,
                            .quantity = qty,
                            .session = session,
-                           .type = type};
+                           .type = type,
+                           .symbol = symbol};
         return std::variant<NewOrder, OrderKey>{new_order};
 
     } else if (fields[0] == "CANCEL") {
@@ -210,6 +215,81 @@ DecodeOutcome decode(std::string_view line, SessionId session) {
     } else {
         return ParseError{.reason = ParseRejectReason::UnknownMessageType, .id = std::nullopt};
     }
+}
+
+std::string encode(const Ack& ack) {
+    return std::format("ACK,{}\n", ack.id);
+}
+
+std::string_view to_token(RejectReason r) {
+    switch (r) {
+    case RejectReason::UnknownOrder:
+        return "UnknownOrder";
+    case RejectReason::UnknownSymbol:
+        return "UnknownSymbol";
+    case RejectReason::InvalidQuantity:
+        return "InvalidQuantity";
+    case RejectReason::InvalidPrice:
+        return "InvalidPrice";
+    }
+    return "";
+}
+
+std::string_view to_token(ParseRejectReason r) {
+    switch (r) {
+    case ParseRejectReason::UnknownMessageType:
+        return "UnknownMessageType";
+    case ParseRejectReason::WrongFieldCount:
+        return "WrongFieldCount";
+    case ParseRejectReason::NonNumericField:
+        return "NonNumericField";
+    case ParseRejectReason::NumberOutOfRange:
+        return "NumberOutOfRange";
+    case ParseRejectReason::UnknownSide:
+        return "UnknownSide";
+    case ParseRejectReason::UnknownOrderType:
+        return "UnknownOrderType";
+    case ParseRejectReason::ExcessPricePrecision:
+        return "ExcessPricePrecision";
+    }
+    return "";
+}
+
+std::string encode(const Reject& reject) {
+    std::string id = (reject.id.has_value()) ? std::to_string(reject.id.value()) : "";
+    // std::visit(callable,variant) pulls out variant tag and gives the value and calls your
+    // callable with it. Callable must handle every variant alternative
+    std::string_view reason = std::visit([](auto r) { return to_token(r); }, reject.reason);
+    return std::format("REJECT,{},{}\n", id, reason);
+}
+
+std::string encode(const CancelConfirm& cancel_confirm) {
+    return std::format("CXL,{}\n", cancel_confirm.id);
+}
+
+std::string_view side_token(Side side) {
+    return side == Side::Buy ? "BUY" : "SELL";
+}
+
+std::string price_to_string(Price ticks) {
+    Price dollars = ticks / 100;
+    Price cents = ticks % 100; // get last two digits $$
+    return std::format("{}.{:02}", dollars, cents);
+}
+
+std::string encode(const Fill& fill) {
+    return std::format("FILL,{},{},{},{},{},{}\n", fill.id, fill.symbol, side_token(fill.side),
+                       fill.qty_filled, price_to_string(fill.price), fill.qty_remaining);
+}
+
+std::string encode(const TradePrint& trade) {
+    return std::format("TRADE,{},{},{},{}\n", trade.symbol, trade.quantity,
+                       price_to_string(trade.price), trade.seq);
+}
+
+std::string encode(const BookUpdate& book) {
+    return std::format("BOOK,{},{},{},{},{}\n", book.symbol, side_token(book.side),
+                       price_to_string(book.price), book.aggregate_qty, book.seq);
 }
 
 } // namespace celebrant

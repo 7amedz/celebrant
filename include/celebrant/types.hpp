@@ -5,6 +5,7 @@
 #include <functional> // for std::hash
 #include <list>
 #include <map>
+#include <string>
 #include <vector>
 
 #include "celebrant/expected.hpp"
@@ -15,6 +16,7 @@ using Price = std::int64_t;
 using Quantity = std::int64_t;
 using SessionId = std::uint64_t;
 using OrderId = std::uint64_t;
+using Symbol = std::string;
 
 enum class Side : std::uint8_t {
     Buy,
@@ -43,6 +45,7 @@ struct NewOrder {
     Quantity quantity;
     SessionId session;
     OrderType type;
+    Symbol symbol;
 };
 
 struct Level {
