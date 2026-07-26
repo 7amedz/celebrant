@@ -7,7 +7,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-add_executable(celebrant_tests smoke_test.cpp order_book_test.cpp property_test.cpp)
+add_executable(celebrant_tests smoke_test.cpp order_book_test.cpp property_test.cpp codec_test.cpp)
 target_link_libraries(celebrant_tests PRIVATE GTest::gtest_main celebrant)
 
 include(GoogleTest)

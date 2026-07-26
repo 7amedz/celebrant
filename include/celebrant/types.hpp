@@ -46,6 +46,8 @@ struct NewOrder {
     SessionId session;
     OrderType type;
     Symbol symbol;
+
+    bool operator==(const NewOrder&) const = default;
 };
 
 struct Level {
