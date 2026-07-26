@@ -176,7 +176,7 @@ DecodeOutcome decode(std::string_view line, SessionId session) {
         }
         Price price = 0;
         if (type == OrderType::Limit) {
-            auto parsed_price = parse_number<Price>(fields[6]);
+            auto parsed_price = parse_price(fields[6]); // USE PARSE_PRICE:))))
             if (parsed_price.has_value()) {
                 price = parsed_price.value();
 
