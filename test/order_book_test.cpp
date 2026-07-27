@@ -2,12 +2,12 @@
 
 #include <gtest/gtest.h>
 
-#include "celebrant/order_book.hpp"
+#include "celebrant/engine.hpp"
 #include "celebrant/types.hpp"
 
 // buy meets a sell of equal qty: one trade, both fully gone
 TEST(Match, FullFillEqualOrder) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder order1 = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -26,8 +26,8 @@ TEST(Match, FullFillEqualOrder) {
         .type = celebrant::OrderType::Limit,
     };
 
-    book.process(order1);            // add resting order
-    auto out = book.process(order2); // agg
+    engine.process(order1);            // add resting order
+    auto out = engine.process(order2); // agg
     ASSERT_TRUE(out.has_value());
     EXPECT_EQ(out.value().size(), 1);
     EXPECT_EQ(out.value()[0].price, order1.price);
@@ -37,17 +37,17 @@ TEST(Match, FullFillEqualOrder) {
     EXPECT_EQ(out.value()[0].aggressor.id, order2.id);
     EXPECT_EQ(out.value()[0].resting.session, order1.session);
     EXPECT_EQ(out.value()[0].resting.id, order1.id);
-    auto rest_cancel = book.cancel({.session = order1.session, .id = order1.id});
+    auto rest_cancel = engine.cancel({.session = order1.session, .id = order1.id});
     ASSERT_FALSE(rest_cancel.has_value());
     EXPECT_EQ(rest_cancel.error(), celebrant::RejectReason::UnknownOrder);
-    auto agg_cancel = book.cancel({.session = order2.session, .id = order2.id});
+    auto agg_cancel = engine.cancel({.session = order2.session, .id = order2.id});
     ASSERT_FALSE(agg_cancel.has_value());
     EXPECT_EQ(agg_cancel.error(), celebrant::RejectReason::UnknownOrder);
 }
 
 // cancel the middle order, the other two keep their queue order
 TEST(Cancel, CancelMidQueue) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder order1 = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -72,11 +72,11 @@ TEST(Cancel, CancelMidQueue) {
         .session = 3,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(order1);
-    book.process(order2);
-    book.process(order3);
+    engine.process(order1);
+    engine.process(order2);
+    engine.process(order3);
 
-    auto cancel_out = book.cancel({.session = order2.session, .id = order2.id}); // cancel order2
+    auto cancel_out = engine.cancel({.session = order2.session, .id = order2.id}); // cancel order2
     ASSERT_TRUE(cancel_out.has_value());
     EXPECT_EQ(cancel_out.value(), 10);
     celebrant::NewOrder buy = {
@@ -87,7 +87,7 @@ TEST(Cancel, CancelMidQueue) {
         .session = 4,
         .type = celebrant::OrderType::Limit,
     };
-    auto buy_outcome = book.process(buy);
+    auto buy_outcome = engine.process(buy);
     ASSERT_TRUE(buy_outcome.has_value());
     ASSERT_TRUE(buy_outcome.value().size() == 2);
     EXPECT_EQ(buy_outcome.value()[0].resting.session, order1.session);
@@ -110,7 +110,7 @@ TEST(Cancel, CancelMidQueue) {
 
 // market buy sweeps several resting orders. One trade each
 TEST(Match, AggressorSweep) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sell1 = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -143,10 +143,10 @@ TEST(Match, AggressorSweep) {
         .session = 4,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sell1);
-    book.process(sell2);
-    book.process(sell3);
-    book.process(sell4);
+    engine.process(sell1);
+    engine.process(sell2);
+    engine.process(sell3);
+    engine.process(sell4);
 
     celebrant::NewOrder buy = {
         .id = 5,
@@ -156,7 +156,7 @@ TEST(Match, AggressorSweep) {
         .session = 5,
         .type = celebrant::OrderType::Market,
     };
-    auto out = book.process(buy);
+    auto out = engine.process(buy);
     ASSERT_TRUE(out.has_value());
     ASSERT_EQ(out.value().size(), 4);
 
@@ -179,7 +179,7 @@ TEST(Match, AggressorSweep) {
 
 // buy bigger than the resting order. Remaining rests
 TEST(Match, AggressorRests) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sell = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -188,7 +188,7 @@ TEST(Match, AggressorRests) {
         .session = 1,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sell);
+    engine.process(sell);
 
     celebrant::NewOrder buy = {
         .id = 2,
@@ -198,7 +198,7 @@ TEST(Match, AggressorRests) {
         .session = 2,
         .type = celebrant::OrderType::Limit,
     };
-    auto out = book.process(buy);
+    auto out = engine.process(buy);
     ASSERT_TRUE(out.has_value());
     ASSERT_EQ(out.value().size(), 1);
     EXPECT_EQ(out.value()[0].resting.id, sell.id);
@@ -206,14 +206,14 @@ TEST(Match, AggressorRests) {
     EXPECT_EQ(out.value()[0].resting_remaining, 0);
 
     // aggressor rests with qty:5 remaining so cancel will return 5
-    auto residual_cancel = book.cancel({.session = buy.session, .id = buy.id});
+    auto residual_cancel = engine.cancel({.session = buy.session, .id = buy.id});
     ASSERT_TRUE(residual_cancel.has_value());
     EXPECT_EQ(residual_cancel.value(), 5);
 }
 
 // buy smaller than resting: buy done, resting stays with the remaining
 TEST(Match, AggressorGetsFilledRestingStays) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sell = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -222,7 +222,7 @@ TEST(Match, AggressorGetsFilledRestingStays) {
         .session = 1,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sell);
+    engine.process(sell);
 
     celebrant::NewOrder buy = {
         .id = 2,
@@ -232,7 +232,7 @@ TEST(Match, AggressorGetsFilledRestingStays) {
         .session = 2,
         .type = celebrant::OrderType::Limit,
     };
-    auto out = book.process(buy);
+    auto out = engine.process(buy);
     ASSERT_TRUE(out.has_value());
     ASSERT_EQ(out.value().size(), 1);
     EXPECT_EQ(out.value()[0].resting.id, sell.id);
@@ -240,19 +240,19 @@ TEST(Match, AggressorGetsFilledRestingStays) {
     EXPECT_EQ(out.value()[0].resting_remaining, 6);
 
     // resting still has 6 remaining. cancel should return 6
-    auto rest_cancel = book.cancel({.session = sell.session, .id = sell.id});
+    auto rest_cancel = engine.cancel({.session = sell.session, .id = sell.id});
     ASSERT_TRUE(rest_cancel.has_value());
     EXPECT_EQ(rest_cancel.value(), 6);
 
     // the buy fully filled, never rested
-    auto agg_cancel = book.cancel({.session = buy.session, .id = buy.id});
+    auto agg_cancel = engine.cancel({.session = buy.session, .id = buy.id});
     ASSERT_FALSE(agg_cancel.has_value());
     EXPECT_EQ(agg_cancel.error(), celebrant::RejectReason::UnknownOrder);
 }
 
 // buy priced below the best ask, no cross, it just rests
 TEST(Match, AggressorBuyPriceLessThanBestAsk) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sell = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -261,7 +261,7 @@ TEST(Match, AggressorBuyPriceLessThanBestAsk) {
         .session = 1,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sell);
+    engine.process(sell);
 
     celebrant::NewOrder buy = {
         .id = 2,
@@ -271,19 +271,19 @@ TEST(Match, AggressorBuyPriceLessThanBestAsk) {
         .session = 2,
         .type = celebrant::OrderType::Limit,
     };
-    auto out = book.process(buy);
+    auto out = engine.process(buy);
     ASSERT_TRUE(out.has_value());
     EXPECT_EQ(out.value().size(), 0); // no trade
 
     // the buy rested so cancelling it should return original quantity
-    auto rest_cancel = book.cancel({.session = buy.session, .id = buy.id});
+    auto rest_cancel = engine.cancel({.session = buy.session, .id = buy.id});
     ASSERT_TRUE(rest_cancel.has_value());
     EXPECT_EQ(rest_cancel.value(), buy.quantity);
 }
 
 // market buy with no sell resting: no trade. dropped
 TEST(Match, MarketBuyEmptyBook) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder buy = {
         .id = 1,
         .side = celebrant::Side::Buy,
@@ -292,18 +292,18 @@ TEST(Match, MarketBuyEmptyBook) {
         .session = 1,
         .type = celebrant::OrderType::Market,
     };
-    auto out = book.process(buy);
+    auto out = engine.process(buy);
     ASSERT_TRUE(out.has_value());
     EXPECT_EQ(out.value().size(), 0); // no trade
 
-    auto cancel_out = book.cancel({.session = buy.session, .id = buy.id});
+    auto cancel_out = engine.cancel({.session = buy.session, .id = buy.id});
     ASSERT_FALSE(cancel_out.has_value());
     EXPECT_EQ(cancel_out.error(), celebrant::RejectReason::UnknownOrder);
 }
 
 // market buy fills what it can. Rest is dropped
 TEST(Match, MarketPartialThenCancelled) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sell = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -312,7 +312,7 @@ TEST(Match, MarketPartialThenCancelled) {
         .session = 1,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sell);
+    engine.process(sell);
 
     celebrant::NewOrder buy = {
         .id = 2,
@@ -322,21 +322,21 @@ TEST(Match, MarketPartialThenCancelled) {
         .session = 2,
         .type = celebrant::OrderType::Market,
     };
-    auto out = book.process(buy);
+    auto out = engine.process(buy);
     ASSERT_TRUE(out.has_value());
     ASSERT_EQ(out.value().size(), 1);
     EXPECT_EQ(out.value()[0].resting.id, sell.id);
     EXPECT_EQ(out.value()[0].quantity, sell.quantity); // fills the 5
     EXPECT_EQ(out.value()[0].resting_remaining, 0);
 
-    auto cancel_out = book.cancel({.session = buy.session, .id = buy.id});
+    auto cancel_out = engine.cancel({.session = buy.session, .id = buy.id});
     ASSERT_FALSE(cancel_out.has_value());
     EXPECT_EQ(cancel_out.error(), celebrant::RejectReason::UnknownOrder);
 }
 
 // two sells same price, the one that rested first fills first
 TEST(Priority, TimePriorityTest) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sellA = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -353,8 +353,8 @@ TEST(Priority, TimePriorityTest) {
         .session = 2,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sellA);
-    book.process(sellB);
+    engine.process(sellA);
+    engine.process(sellB);
 
     celebrant::NewOrder buy = {
         .id = 3,
@@ -364,19 +364,19 @@ TEST(Priority, TimePriorityTest) {
         .session = 3,
         .type = celebrant::OrderType::Limit,
     };
-    auto out = book.process(buy);
+    auto out = engine.process(buy);
     ASSERT_TRUE(out.has_value());
     ASSERT_EQ(out.value().size(), 1);
     EXPECT_EQ(out.value()[0].resting.id, sellA.id);
 
-    auto b_cancel = book.cancel({.session = sellB.session, .id = sellB.id});
+    auto b_cancel = engine.cancel({.session = sellB.session, .id = sellB.id});
     ASSERT_TRUE(b_cancel.has_value());
     EXPECT_EQ(b_cancel.value(), 10);
 }
 
 // better priced order fills first even though it came after
 TEST(Priority, PricePriority) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sellHigh = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -393,8 +393,8 @@ TEST(Priority, PricePriority) {
         .session = 2,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sellHigh);
-    book.process(sellLow);
+    engine.process(sellHigh);
+    engine.process(sellLow);
 
     celebrant::NewOrder buy = {
         .id = 3,
@@ -404,7 +404,7 @@ TEST(Priority, PricePriority) {
         .session = 3,
         .type = celebrant::OrderType::Limit,
     };
-    auto out = book.process(buy);
+    auto out = engine.process(buy);
     ASSERT_TRUE(out.has_value());
     ASSERT_EQ(out.value().size(), 1);
     EXPECT_EQ(out.value()[0].resting.id, sellLow.id);
@@ -413,7 +413,7 @@ TEST(Priority, PricePriority) {
 
 // cancel a resting order, a second cancel misses it
 TEST(Cancel, CancelRestingOrder) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sell = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -422,20 +422,20 @@ TEST(Cancel, CancelRestingOrder) {
         .session = 1,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sell);
+    engine.process(sell);
 
-    auto cancel_out = book.cancel({.session = sell.session, .id = sell.id});
+    auto cancel_out = engine.cancel({.session = sell.session, .id = sell.id});
     ASSERT_TRUE(cancel_out.has_value());
     EXPECT_EQ(cancel_out.value(), 10);
 
-    auto second_cancel = book.cancel({.session = sell.session, .id = sell.id});
+    auto second_cancel = engine.cancel({.session = sell.session, .id = sell.id});
     ASSERT_FALSE(second_cancel.has_value());
     EXPECT_EQ(second_cancel.error(), celebrant::RejectReason::UnknownOrder);
 }
 
 // cancel the only order at a price -> that whole level is gone
 TEST(Cancel, CancelLastOrderErasesLevel) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sell = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -444,9 +444,9 @@ TEST(Cancel, CancelLastOrderErasesLevel) {
         .session = 1,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sell);
+    engine.process(sell);
 
-    auto cancel_out = book.cancel({.session = sell.session, .id = sell.id});
+    auto cancel_out = engine.cancel({.session = sell.session, .id = sell.id});
     ASSERT_TRUE(cancel_out.has_value());
 
     celebrant::NewOrder buy = {
@@ -457,14 +457,14 @@ TEST(Cancel, CancelLastOrderErasesLevel) {
         .session = 2,
         .type = celebrant::OrderType::Limit,
     };
-    auto out = book.process(buy);
+    auto out = engine.process(buy);
     ASSERT_TRUE(out.has_value());
     EXPECT_EQ(out.value().size(), 0);
 }
 
 // cancel a partly filled order, the remaining is removed
 TEST(Cancel, CancelPartiallyFilled) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sell = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -473,7 +473,7 @@ TEST(Cancel, CancelPartiallyFilled) {
         .session = 1,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sell);
+    engine.process(sell);
 
     celebrant::NewOrder buy = {
         .id = 2,
@@ -483,24 +483,24 @@ TEST(Cancel, CancelPartiallyFilled) {
         .session = 2,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(buy);
+    engine.process(buy);
 
-    auto cancel_out = book.cancel({.session = sell.session, .id = sell.id});
+    auto cancel_out = engine.cancel({.session = sell.session, .id = sell.id});
     ASSERT_TRUE(cancel_out.has_value());
     EXPECT_EQ(cancel_out.value(), 6);
 }
 
 // cancel an id that was never placed: unknown order
 TEST(Cancel, CancelUnknownId) {
-    celebrant::OrderBook book;
-    auto cancel_out = book.cancel({.session = 1, .id = 99});
+    celebrant::Engine engine;
+    auto cancel_out = engine.cancel({.session = 1, .id = 99});
     ASSERT_FALSE(cancel_out.has_value());
     EXPECT_EQ(cancel_out.error(), celebrant::RejectReason::UnknownOrder);
 }
 
 // cancel an order that already fully filled: unknown order
 TEST(Cancel, CancelFullyFilled) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sell = {
         .id = 1,
         .side = celebrant::Side::Sell,
@@ -509,7 +509,7 @@ TEST(Cancel, CancelFullyFilled) {
         .session = 1,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sell);
+    engine.process(sell);
 
     celebrant::NewOrder buy = {
         .id = 2,
@@ -519,16 +519,16 @@ TEST(Cancel, CancelFullyFilled) {
         .session = 2,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(buy);
+    engine.process(buy);
 
-    auto cancel_out = book.cancel({.session = sell.session, .id = sell.id});
+    auto cancel_out = engine.cancel({.session = sell.session, .id = sell.id});
     ASSERT_FALSE(cancel_out.has_value());
     EXPECT_EQ(cancel_out.error(), celebrant::RejectReason::UnknownOrder);
 }
 
 // wrong session cannot cancel someone else's order
 TEST(Cancel, CancelWrongSession) {
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
     celebrant::NewOrder sell = {
         .id = 5,
         .side = celebrant::Side::Sell,
@@ -537,13 +537,13 @@ TEST(Cancel, CancelWrongSession) {
         .session = 1,
         .type = celebrant::OrderType::Limit,
     };
-    book.process(sell);
+    engine.process(sell);
 
-    auto wrong = book.cancel({.session = 2, .id = 5});
+    auto wrong = engine.cancel({.session = 2, .id = 5});
     ASSERT_FALSE(wrong.has_value());
     EXPECT_EQ(wrong.error(), celebrant::RejectReason::UnknownOrder);
 
-    auto right = book.cancel({.session = 1, .id = 5});
+    auto right = engine.cancel({.session = 1, .id = 5});
     ASSERT_TRUE(right.has_value());
     EXPECT_EQ(right.value(), 10);
 }

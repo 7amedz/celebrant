@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include "celebrant/order_book.hpp"
+#include "celebrant/engine.hpp"
 #include "celebrant/types.hpp"
 
 TEST(Property, QuantityConservation) {
@@ -13,7 +13,7 @@ TEST(Property, QuantityConservation) {
     std::uniform_int_distribution<celebrant::Price> price_d(95, 105);
     std::uniform_int_distribution<celebrant::Quantity> qty_d(1, 20);
 
-    celebrant::OrderBook book;
+    celebrant::Engine engine;
 
     std::map<celebrant::OrderKey, celebrant::Quantity> submitted;
     std::map<celebrant::OrderKey, celebrant::Quantity> filled;
@@ -29,7 +29,7 @@ TEST(Property, QuantityConservation) {
             .type = (type_d(rng) != 0) ? celebrant::OrderType::Limit : celebrant::OrderType::Market,
         };
 
-        auto out = book.process(o);
+        auto out = engine.process(o);
         submitted[{.session = o.session, .id = o.id}] = o.quantity;
 
         ASSERT_TRUE(out.has_value());

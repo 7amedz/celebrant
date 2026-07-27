@@ -9,7 +9,7 @@
 
 namespace celebrant {
 
-Quantity OrderBook::remove_resting(Handle h) {
+Quantity OrderBook::remove_resting(Handle h, EngineIndex& index) {
     Quantity removed = h.it->remaining;
     OrderKey key = {.session = h.it->session, .id = h.it->id};
     Side side = h.it->side;
@@ -20,17 +20,17 @@ Quantity OrderBook::remove_resting(Handle h) {
     if (level.orders.empty()) {
         bookside.erase(h.level_it);
     }
-    index_.erase(key);
+    index.erase(key);
 
     return removed;
 }
-CancelOutcome OrderBook::cancel(OrderKey key) {
-    auto found = index_.find(key); // use find to get it
-    if (found == index_.end()) {   // check if not in book
+CancelOutcome OrderBook::cancel(OrderKey key, EngineIndex& index) {
+    auto found = index.find(key); // use find to get it
+    if (found == index.end()) {   // check if not in book
         RejectReason reason = RejectReason::UnknownOrder;
         return reason;
     }
-    Quantity removed_qty = remove_resting(found->second);
+    Quantity removed_qty = remove_resting(found->second.handle, index);
     return removed_qty;
 }
 
@@ -48,7 +48,7 @@ BookSide::iterator OrderBook::best_level(BookSide& resting_side, Side aggressor_
     return (aggressor_side == Side::Buy) ? resting_side.begin() : std::prev(resting_side.end());
 }
 
-Outcome OrderBook::process(NewOrder new_order) {
+Outcome OrderBook::process(NewOrder new_order, EngineIndex& index) {
     Quantity aggressor_remaining = new_order.quantity;
     Side order_side = new_order.side;
     BookSide& resting_bookside = (order_side == Side::Sell) ? bids_ : asks_;
@@ -75,7 +75,7 @@ Outcome OrderBook::process(NewOrder new_order) {
         best_price_level->second.aggregate -= trade_qty;
         if (best_resting_order.remaining == 0) {
             auto r_it = resting_orders.begin();
-            remove_resting({.level_it = best_price_level, .it = r_it});
+            remove_resting({.level_it = best_price_level, .it = r_it}, index);
         }
     }
     if (aggressor_remaining > 0 &&
@@ -94,7 +94,8 @@ Outcome OrderBook::process(NewOrder new_order) {
         std::list<Order>& orders_list = price_level_it->second.orders;
         auto it = orders_list.insert(orders_list.end(), order);
         price_level_it->second.aggregate += order.remaining;
-        index_[{.session = order.session, .id = order.id}] = {.level_it = price_level_it, .it = it};
+        index[{.session = order.session, .id = order.id}] = {
+            .book = this, .handle = {.level_it = price_level_it, .it = it}};
     }
     return trades;
 }

@@ -7,7 +7,7 @@
 #include <random>
 #include <vector>
 
-#include "celebrant/order_book.hpp"
+#include "celebrant/engine.hpp"
 #include "celebrant/types.hpp"
 
 using std::size_t;
@@ -38,11 +38,11 @@ int main() {
         });
     }
 
-    OrderBook book;
+    Engine engine;
 
     // warmup loop
     for (int i = 0; i < warmup; ++i) {
-        auto out = book.process(orders[i]);
+        auto out = engine.process(orders[i]);
         (void)out;
     }
 
@@ -51,7 +51,7 @@ int main() {
     std::size_t sink = 0;
     for (int i = warmup; i < total; ++i) {
         auto start = std::chrono::steady_clock::now();
-        auto out = book.process(orders[i]);
+        auto out = engine.process(orders[i]);
         auto end = std::chrono::steady_clock::now();
         sink += out.value().size(); // use the result -> no dead-code elimination
         lat_ns.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count());
