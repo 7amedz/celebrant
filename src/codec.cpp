@@ -3,6 +3,7 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <format>
 #include <optional>
 #include <string>
@@ -107,7 +108,10 @@ Expected<Price, ParseRejectReason> parse_price(std::string_view field) {
     return price;
 }
 
-DecodeOutcome decode(std::string_view line, SessionId session) {
+// NEW,id,symbol,side,LIMIT,qty,price    e.g. NEW,1,AAPL,BUY,LIMIT,25,100.50
+// NEW,id,symbol,side,MARKET,qty           e.g. NEW,2,AAPL,SELL,MARKET,10
+
+DecodeOutcome decode(std::string_view line, SessionId session) { // TODO: extract this function
 
     std::vector<std::string_view> fields;
     while (true) {
@@ -132,10 +136,19 @@ DecodeOutcome decode(std::string_view line, SessionId session) {
         } else {
             return ParseError{.reason = id_parse.error(), .id = std::nullopt};
         }
-        if (field_count < 5)
+        if (field_count < 5) {
             return ParseError{.reason = ParseRejectReason::WrongFieldCount, .id = id};
+        }
+        if (fields[2].empty()) {
 
-        Symbol symbol = std::string(fields[2]);
+            return ParseError{.reason = ParseRejectReason::EmptySymbol, .id = id};
+        }
+
+        if (fields[2].size() > 8) {
+
+            return ParseError{.reason = ParseRejectReason::SymbolTooLong, .id = id};
+        }
+        auto symbol = Symbol(fields[2]);
 
         OrderType type;
         auto type_parse = parse_order_type(fields[4]);
@@ -251,6 +264,10 @@ std::string_view to_token(ParseRejectReason r) {
         return "UnknownOrderType";
     case ParseRejectReason::ExcessPricePrecision:
         return "ExcessPricePrecision";
+    case ParseRejectReason::SymbolTooLong:
+        return "SymbolTooLong";
+    case ParseRejectReason::EmptySymbol:
+        return "EmptySymbol";
     }
     return "";
 }
@@ -277,18 +294,24 @@ std::string price_to_string(Price ticks) {
     return std::format("{}.{:02}", dollars, cents);
 }
 
+std::string_view
+to_string_view(const Symbol& s) { // format doesn't take array since they are not null terminated
+    return std::string_view(s.data.data(), strnlen(s.data.data(), 8)); // strlen stops at null or 8
+}
+
 std::string encode(const Fill& fill) {
-    return std::format("FILL,{},{},{},{},{},{}\n", fill.id, fill.symbol, side_token(fill.side),
-                       fill.qty_filled, price_to_string(fill.price), fill.qty_remaining);
+    return std::format("FILL,{},{},{},{},{},{}\n", fill.id, to_string_view(fill.symbol),
+                       side_token(fill.side), fill.qty_filled, price_to_string(fill.price),
+                       fill.qty_remaining);
 }
 
 std::string encode(const TradePrint& trade) {
-    return std::format("TRADE,{},{},{},{}\n", trade.symbol, trade.quantity,
+    return std::format("TRADE,{},{},{},{}\n", to_string_view(trade.symbol), trade.quantity,
                        price_to_string(trade.price), trade.seq);
 }
 
 std::string encode(const BookUpdate& book) {
-    return std::format("BOOK,{},{},{},{},{}\n", book.symbol, side_token(book.side),
+    return std::format("BOOK,{},{},{},{},{}\n", to_string_view(book.symbol), side_token(book.side),
                        price_to_string(book.price), book.aggregate_qty, book.seq);
 }
 

@@ -19,6 +19,8 @@ enum class ParseRejectReason : std::uint8_t {
     UnknownSide,
     UnknownOrderType,
     ExcessPricePrecision,
+    SymbolTooLong,
+    EmptySymbol,
 };
 
 struct ParseError {

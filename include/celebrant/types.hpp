@@ -1,11 +1,14 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <compare> //for std::strong_ordering in spaceship operator
 #include <cstdint>
 #include <functional> // for std::hash
 #include <list>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "celebrant/expected.hpp"
@@ -16,7 +19,19 @@ using Price = std::int64_t;
 using Quantity = std::int64_t;
 using SessionId = std::uint64_t;
 using OrderId = std::uint64_t;
-using Symbol = std::string;
+
+struct Symbol {
+    std::array<char, 8> data{};
+
+    Symbol() = default;
+    explicit Symbol(std::string_view s) { // for decode (which checks size<9 before running this)
+        std::ranges::copy(s, data.begin());
+        // remaining bytes remain zero
+    }
+
+    auto operator<=>(const Symbol&) const = default;
+    bool operator==(const Symbol&) const = default;
+};
 
 enum class Side : std::uint8_t {
     Buy,

@@ -22,7 +22,7 @@ TEST(CodecDecode, NewLimit) {
                       .quantity = 25,
                       .session = 7,
                       .type = OrderType::Limit,
-                      .symbol = "AAPL"};
+                      .symbol = Symbol{"AAPL"}};
     EXPECT_EQ(std::get<NewOrder>(result.value()), expected);
 }
 
@@ -115,7 +115,7 @@ TEST(CodecEncode, CancelConfirm) { EXPECT_EQ(encode(CancelConfirm{.id = 5}), "CX
 
 TEST(CodecEncode, Fill) {
     Fill fill{.id = 5,
-              .symbol = "AAPL",
+              .symbol = Symbol{"AAPL"},
               .side = Side::Buy,
               .qty_filled = 100,
               .price = 10050,
@@ -126,7 +126,7 @@ TEST(CodecEncode, Fill) {
 // price fraction zero-pads: 10005 -> "100.05", not "100.5"
 TEST(CodecEncode, FillPricePadding) {
     Fill fill{.id = 5,
-              .symbol = "AAPL",
+              .symbol = Symbol{"AAPL"},
               .side = Side::Buy,
               .qty_filled = 100,
               .price = 10005,
@@ -135,13 +135,13 @@ TEST(CodecEncode, FillPricePadding) {
 }
 
 TEST(CodecEncode, TradePrint) {
-    TradePrint trade{.symbol = "AAPL", .quantity = 100, .price = 10050, .seq = 42};
+    TradePrint trade{.symbol = Symbol{"AAPL"}, .quantity = 100, .price = 10050, .seq = 42};
     EXPECT_EQ(encode(trade), "TRADE,AAPL,100,100.50,42\n");
 }
 
 TEST(CodecEncode, BookUpdate) {
     BookUpdate book{
-        .symbol = "AAPL", .side = Side::Buy, .price = 10050, .aggregate_qty = 250, .seq = 43};
+        .symbol = Symbol{"AAPL"}, .side = Side::Buy, .price = 10050, .aggregate_qty = 250, .seq = 43};
     EXPECT_EQ(encode(book), "BOOK,AAPL,BUY,100.50,250,43\n");
 }
 
