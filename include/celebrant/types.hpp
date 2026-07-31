@@ -9,6 +9,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 #include "celebrant/expected.hpp"
@@ -103,6 +104,8 @@ struct Trade {
 
 using Outcome = Expected<std::vector<Trade>, RejectReason>;
 using CancelOutcome = Expected<Quantity, RejectReason>;
+
+using Request = std::variant<NewOrder, OrderKey>; // InboundQueue element type
 
 } // namespace celebrant
 
