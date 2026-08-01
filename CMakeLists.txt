@@ -13,7 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # the engine library; consumers link this to get the code + include/ on their path
-add_library(celebrant STATIC src/order_book.cpp src/codec.cpp src/engine.cpp)
+add_library(celebrant STATIC src/order_book.cpp src/codec.cpp src/engine.cpp src/engine_runner.cpp)
 target_include_directories(celebrant PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 enable_testing()
