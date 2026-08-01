@@ -1,5 +1,7 @@
 #include "celebrant/engine_runner.hpp"
 
+#include <variant>
+
 #include "celebrant/types.hpp"
 
 namespace celebrant {
@@ -32,13 +34,24 @@ void EngineRunner::run() {
         //     engine_.cancel(std::get<OrderKey>(request));
         // }
 
-        std::visit(Overloaded{
-                       [this](const NewOrder& o) { engine_.process(o); },
-                       [this](const OrderKey& k) { engine_.cancel(k); },
-                   },
-                   request);
+        bool result =
+            std::visit(Overloaded{
+                           [this](const NewOrder& o) {
+                               engine_.process(o);
+                               return true;
+                           },
+                           [this](const OrderKey& k) {
+                               engine_.cancel(k);
+                               return true;
+                           },
+                           [](const Shutdown& s) { return false; }, // no need to capture this
+                       },
+                       request);
 
         // std::visit (function,variant) returns what function returns
+        if (!result) {
+            break;
+        }
     }
 }
 
