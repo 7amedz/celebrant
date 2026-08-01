@@ -105,7 +105,9 @@ struct Trade {
 using Outcome = Expected<std::vector<Trade>, RejectReason>;
 using CancelOutcome = Expected<Quantity, RejectReason>;
 
-using Request = std::variant<NewOrder, OrderKey>; // InboundQueue element type
+struct Shutdown {};
+
+using Request = std::variant<NewOrder, OrderKey, Shutdown>; // InboundQueue element type
 
 } // namespace celebrant
 
