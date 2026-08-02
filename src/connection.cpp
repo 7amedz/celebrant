@@ -39,7 +39,8 @@ void Connection::start_read() {
                 if (outcome.has_value()) {
                     std::visit([this](const auto& msg) { queue_.push(msg); }, outcome.value());
                 } else {
-                    // TODO send reject
+                    const ParseError& err = outcome.error();
+                    send(encode(Reject{.id = err.id, .reason = err.reason}));
                 }
                 accumulator_.erase(0, position + 1); // erase upto and past the newline
             }
