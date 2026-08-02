@@ -12,17 +12,21 @@
 #include <boost/asio/write.hpp>
 
 #include "celebrant/codec.hpp"
+#include "celebrant/connection_registry.hpp"
 
 namespace celebrant {
 
-Connection::Connection(boost::asio::ip::tcp::socket sock, InboundQueue& queue, SessionId session)
-    : sock_(std::move(sock)), queue_(queue), session_(session) {}
+Connection::Connection(boost::asio::ip::tcp::socket sock, InboundQueue& queue, SessionId session,
+                       ConnectionRegistry& registry)
+    : sock_(std::move(sock)), queue_(queue), session_(session), registry_(registry) {}
 
 void Connection::start_read() {
     auto self = shared_from_this();
     sock_.async_read_some(
         boost::asio::buffer(buf_), [this, self](std::error_code ec, std::size_t n) {
             if (ec) {
+                registry_.remove(session_);
+                queue_.push(CancelAll{session_});
                 return; // re arm only if no error
             }
             accumulator_.append(buf_.data(), n);
@@ -55,6 +59,8 @@ void Connection::do_write() {
     boost::asio::async_write(sock_, boost::asio::buffer(outbox_.front()),
                              [this, self](std::error_code ec, std::size_t n) {
                                  if (ec) {
+                                     registry_.remove(session_);
+                                     queue_.push(CancelAll{session_});
                                      return;
                                  }
                                  outbox_.pop_front();

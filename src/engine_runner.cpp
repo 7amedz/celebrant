@@ -78,6 +78,10 @@ void EngineRunner::run() {
                                }
                                return true;
                            },
+                           [this](const CancelAll& c) {
+                               engine_.cancel_all(c.session);
+                               return true;
+                           },
                            [](const Shutdown& s) { return false; }, // no need to capture this
                        },
                        request);

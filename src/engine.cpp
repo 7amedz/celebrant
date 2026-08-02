@@ -1,5 +1,7 @@
 #include "celebrant/engine.hpp"
 
+#include <vector>
+
 #include "celebrant/types.hpp"
 
 namespace celebrant {
@@ -17,6 +19,18 @@ CancelOutcome Engine::cancel(OrderKey key) {
     auto location = index_[key];
     auto* book = location.book;
     return book->cancel(key, index_);
+}
+
+void Engine::cancel_all(SessionId session) {
+    std::vector<OrderKey> keys;
+    for (const auto& [key, loc] : index_) {
+        if (key.session == session) {
+            keys.push_back(key);
+        }
+    }
+    for (const OrderKey& key : keys) {
+        cancel(key);
+    }
 }
 
 } // namespace celebrant

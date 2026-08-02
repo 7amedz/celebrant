@@ -12,9 +12,12 @@
 
 namespace celebrant {
 
+class ConnectionRegistry;
+
 class Connection : public std::enable_shared_from_this<Connection> {
   public:
-    Connection(boost::asio::ip::tcp::socket sock, InboundQueue& queue, SessionId session);
+    Connection(boost::asio::ip::tcp::socket sock, InboundQueue& queue, SessionId session,
+               ConnectionRegistry& registry);
     void start_read();
     void send(std::string message);
 
@@ -23,6 +26,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
     boost::asio::ip::tcp::socket sock_;
     InboundQueue& queue_;
     SessionId session_;
+    ConnectionRegistry& registry_;
     std::array<char, 1024> buf_;
     std::string accumulator_; // leftover bytes
     std::deque<std::string> outbox_;
