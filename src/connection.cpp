@@ -1,0 +1,45 @@
+#include "celebrant/connection.hpp"
+
+#include <cstddef>
+#include <iostream>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <variant>
+
+#include <boost/asio/buffer.hpp>
+#include <boost/asio/ip/tcp.hpp>
+
+#include "celebrant/codec.hpp"
+
+namespace celebrant {
+
+Connection::Connection(boost::asio::ip::tcp::socket sock, InboundQueue& queue, SessionId session)
+    : sock_(std::move(sock)), queue_(queue), session_(session) {}
+
+void Connection::start_read() {
+    auto self = shared_from_this();
+    sock_.async_read_some(
+        boost::asio::buffer(buf_), [this, self](std::error_code ec, std::size_t n) {
+            if (ec) {
+                return; // re arm only if no error
+            }
+            accumulator_.append(buf_.data(), n);
+
+            std::size_t position;
+            while ((position = accumulator_.find('\n')) != std::string::npos) { // if delimiter
+                                                                                // found
+                std::string_view line(accumulator_.data(), position);
+                auto outcome = decode(line, session_);
+                if (outcome.has_value()) {
+                    std::visit([this](const auto& msg) { queue_.push(msg); }, outcome.value());
+                } else {
+                    // TODO send reject
+                }
+                accumulator_.erase(0, position + 1); // erase upto and past the newline
+            }
+            start_read(); // re arm (insta return)
+        });
+}
+
+} // namespace celebrant
