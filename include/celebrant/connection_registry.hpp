@@ -12,7 +12,7 @@ class ConnectionRegistry {
   public:
     void add(SessionId id, std::shared_ptr<Connection> conn) { registry_[id] = std::move(conn); }
     void remove(SessionId id) { registry_.erase(id); }
-    std::shared_ptr<Connection> get(SessionId id) {
+    std::shared_ptr<Connection> get(SessionId id) const {
         auto it = registry_.find(id);
         if (it != registry_.end()) {
             return it->second;

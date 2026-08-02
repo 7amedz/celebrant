@@ -9,6 +9,7 @@
 
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/write.hpp>
 
 #include "celebrant/codec.hpp"
 
@@ -40,6 +41,27 @@ void Connection::start_read() {
             }
             start_read(); // re arm (insta return)
         });
+}
+
+void Connection::send(std::string message) {
+    outbox_.push_back(std::move(message));
+    if (outbox_.size() == 1) {
+        do_write();
+    }
+}
+
+void Connection::do_write() {
+    auto self = shared_from_this();
+    boost::asio::async_write(sock_, boost::asio::buffer(outbox_.front()),
+                             [this, self](std::error_code ec, std::size_t n) {
+                                 if (ec) {
+                                     return;
+                                 }
+                                 outbox_.pop_front();
+                                 if (!outbox_.empty()) {
+                                     do_write();
+                                 }
+                             }); // handler runs on write
 }
 
 } // namespace celebrant
