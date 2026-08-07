@@ -4,7 +4,7 @@
 
 #include <boost/asio/post.hpp>
 
-#include "celebrant/codec.hpp"
+#include "celebrant/sbe_codec.hpp"
 #include "celebrant/types.hpp"
 
 namespace celebrant {
@@ -39,52 +39,59 @@ void EngineRunner::run() {
         //     engine_.cancel(std::get<OrderKey>(request));
         // }
 
-        bool result =
-            std::visit(Overloaded{
-                           [this](const NewOrder& o) {
-                               Outcome outcome = engine_.process(o);
-                               if (!outcome.has_value()) {
-                                   send_to(o.session, encode(Reject{.id = o.id, .reason = outcome.error()}));
-                                   return true;
-                               }
-                               send_to(o.session, encode(Ack{.id = o.id}));
-                               Side resting_side = (o.side == Side::Buy) ? Side::Sell : Side::Buy;
-                               Quantity remaining = o.quantity;
-                               for (const Trade& t : outcome.value()) {
-                                   remaining -= t.quantity;
-                                   send_to(t.aggressor.session,
-                                           encode(Fill{.id = t.aggressor.id,
+        bool result = std::visit(
+            Overloaded{
+                [this](const NewOrder& o) {
+                    Outcome outcome = engine_.process(o);
+                    if (!outcome.has_value()) {
+                        send_to(o.session,
+                                sbe_codec::encode(Reject{.id = o.id, .reason = outcome.error()}));
+                        return true;
+                    }
+                    send_to(o.session, sbe_codec::encode(Ack{
+                                           .id = o.id,
+                                           .symbol = o.symbol,
+                                           .side = o.side,
+                                           .leaves_qty = o.quantity,
+                                       }));
+                    Side resting_side = (o.side == Side::Buy) ? Side::Sell : Side::Buy;
+                    Quantity remaining = o.quantity;
+                    for (const Trade& t : outcome.value()) {
+                        remaining -= t.quantity;
+                        send_to(t.aggressor.session,
+                                sbe_codec::encode(Fill{.id = t.aggressor.id,
                                                        .symbol = o.symbol,
                                                        .side = o.side,
                                                        .qty_filled = t.quantity,
                                                        .price = t.price,
                                                        .qty_remaining = remaining}));
-                                   send_to(t.resting.session,
-                                           encode(Fill{.id = t.resting.id,
+                        send_to(t.resting.session,
+                                sbe_codec::encode(Fill{.id = t.resting.id,
                                                        .symbol = o.symbol,
                                                        .side = resting_side,
                                                        .qty_filled = t.quantity,
                                                        .price = t.price,
                                                        .qty_remaining = t.resting_remaining}));
-                               }
-                               return true;
-                           },
-                           [this](const OrderKey& k) {
-                               CancelOutcome outcome = engine_.cancel(k);
-                               if (!outcome.has_value()) {
-                                   send_to(k.session, encode(Reject{.id = k.id, .reason = outcome.error()}));
-                               } else {
-                                   send_to(k.session, encode(CancelConfirm{.id = k.id}));
-                               }
-                               return true;
-                           },
-                           [this](const CancelAll& c) {
-                               engine_.cancel_all(c.session);
-                               return true;
-                           },
-                           [](const Shutdown& s) { return false; }, // no need to capture this
-                       },
-                       request);
+                    }
+                    return true;
+                },
+                [this](const OrderKey& k) {
+                    CancelOutcome outcome = engine_.cancel(k);
+                    if (!outcome.has_value()) {
+                        send_to(k.session,
+                                sbe_codec::encode(Reject{.id = k.id, .reason = outcome.error()}));
+                    } else {
+                        send_to(k.session, sbe_codec::encode(CancelConfirm{.id = k.id}));
+                    }
+                    return true;
+                },
+                [this](const CancelAll& c) {
+                    engine_.cancel_all(c.session);
+                    return true;
+                },
+                [](const Shutdown& s) { return false; }, // no need to capture this
+            },
+            request);
 
         // std::visit (function,variant) returns what function returns
         if (!result) {

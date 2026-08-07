@@ -1,12 +1,16 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 
 #include "celebrant/codec.hpp"
 #include "celebrant/types.hpp"
 
 namespace celebrant::sbe_codec {
+
+[[nodiscard]] std::optional<std::size_t> frame_length(char* buffer,
+                                                      std::size_t available); // header+block
 
 [[nodiscard]] DecodeOutcome decode(char* buffer, std::size_t len, SessionId session);
 

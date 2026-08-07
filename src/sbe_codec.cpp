@@ -100,6 +100,14 @@ DecodeOutcome decode_cancel(char* buffer, std::size_t len, std::uint16_t block_l
     return std::variant<NewOrder, OrderKey>{key};
 }
 
+std::optional<std::size_t> frame_length(char* buffer, std::size_t available) {
+    if (available < sbe::MessageHeader::encodedLength()) {
+        return std::nullopt; // header didn't arrive fully
+    }
+    sbe::MessageHeader header(buffer, available);
+    return sbe::MessageHeader::encodedLength() + header.blockLength();
+}
+
 DecodeOutcome decode(char* buffer, std::size_t len, SessionId session) {
     sbe::MessageHeader header(buffer, len);
     const std::uint16_t template_id = header.templateId();
