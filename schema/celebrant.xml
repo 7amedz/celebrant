@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbe:messageSchema
+    xmlns:sbe="http://fixprotocol.io/2016/sbe"
+    package="celebrant.sbe"
+    id="1"
+    version="0"
+    semanticVersion="FIX.4.4"
+    byteOrder="littleEndian"
+    description="Celebrant order-entry wire format. FIX 4.4 semantics, SBE encoding.">
+
+  <types>
+    <composite name="messageHeader" description="Template id and root block length">
+      <type name="blockLength" primitiveType="uint16"/>
+      <type name="templateId"  primitiveType="uint16"/>
+      <type name="schemaId"    primitiveType="uint16"/>
+      <type name="version"     primitiveType="uint16"/>
+    </composite>
+
+    <!-- Symbol: fixed 8-byte -->
+    <type name="Symbol" primitiveType="char" length="8" characterEncoding="ASCII"/>
+
+    <!-- Price and Quantity are plain int64. Price is in cents (minor units). -->
+    <type name="Price"    primitiveType="int64" semanticType="Price" description="cents / minor units"/>
+    <type name="Quantity" primitiveType="int64" semanticType="Qty"/>
+
+
+    <!-- Side (tag 54) -->
+    <enum name="Side" encodingType="char">
+      <validValue name="Buy">1</validValue>
+      <validValue name="Sell">2</validValue>
+    </enum>
+
+    <!-- OrdType (tag 40) -->
+    <enum name="OrdType" encodingType="char">
+      <validValue name="Market">1</validValue>
+      <validValue name="Limit">2</validValue>
+    </enum>
+
+    <!-- ExecType (tag 150) -->
+    <enum name="ExecType" encodingType="char">
+      <validValue name="New">0</validValue>       <!-- order accepted / resting -->
+      <validValue name="Canceled">4</validValue>  <!-- CancelConfirm -->
+      <validValue name="Rejected">8</validValue>  <!-- Reject -->
+      <validValue name="Trade">F</validValue>     <!-- fill -->
+    </enum>
+
+    <!-- OrdStatus (tag 39) state after event. -->
+    <enum name="OrdStatus" encodingType="char">
+      <validValue name="New">0</validValue>
+      <validValue name="PartiallyFilled">1</validValue>
+      <validValue name="Filled">2</validValue>
+      <validValue name="Canceled">4</validValue>
+      <validValue name="Rejected">8</validValue>
+    </enum>
+
+    <enum name="OrdRejReason" encodingType="uint8" nullValue="255">
+      <validValue name="UnknownSymbol">1</validValue>
+      <validValue name="UnknownOrder">5</validValue>
+      <validValue name="InvalidQuantity">13</validValue>
+      <validValue name="Other">99</validValue>
+    </enum>
+  </types>
+
+  <sbe:message name="NewOrderSingle" id="1" description="FIX 4.4 NewOrderSingle (subset)">
+    <field name="ClOrdID"  id="11" type="uint64"/>
+    <field name="OrderQty" id="38" type="Quantity"/>
+    <field name="OrdType"  id="40" type="OrdType"/>
+    <field name="Price"    id="44" type="Price"/>
+    <field name="Side"     id="54" type="Side"/>
+    <field name="Symbol"   id="55" type="Symbol"/>
+  </sbe:message>
+
+  <sbe:message name="OrderCancelRequest" id="3" description="FIX 4.4 OrderCancelRequest (subset)">
+    <field name="OrigClOrdID" id="41" type="uint64"/>
+  </sbe:message>
+
+
+
+  <sbe:message name="ExecutionReport" id="2" description="FIX 4.4 ExecutionReport (subset)">
+    <field name="ClOrdID"      id="11"  type="uint64"/>
+    <field name="LastPx"       id="31"  type="Price"/>       <!-- fill price (Trade) -->
+    <field name="LastQty"      id="32"  type="Quantity"/>    <!-- fill's qty (Trade) -->
+    <field name="OrdStatus"    id="39"  type="OrdStatus"/>
+    <field name="Side"         id="54"  type="Side"/>
+    <field name="Symbol"       id="55"  type="Symbol"/>
+    <field name="OrdRejReason" id="103" type="OrdRejReason"/> <!-- Rejected only, else null -->
+    <field name="ExecType"     id="150" type="ExecType"/>
+    <field name="LeavesQty"    id="151" type="Quantity"/>    <!-- qty still resting -->
+  </sbe:message>
+
+</sbe:messageSchema>
