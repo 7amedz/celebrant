@@ -23,7 +23,6 @@ set(SBE_JAR     ${CMAKE_CURRENT_SOURCE_DIR}/tools/sbe-all-1.39.0.jar)
 set(SBE_SCHEMA  ${CMAKE_CURRENT_SOURCE_DIR}/schema/celebrant.xml)
 set(SBE_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
-# The headers the generator produces (one per message + type in the schema).
 set(SBE_GEN_HEADERS
     ${SBE_GEN_DIR}/celebrant_sbe/MessageHeader.h
     ${SBE_GEN_DIR}/celebrant_sbe/NewOrderSingle.h
@@ -49,7 +48,7 @@ add_custom_command(
 add_custom_target(sbe_codegen DEPENDS ${SBE_GEN_HEADERS})
 
 # the engine library; consumers link this to get the code + include/ on their path
-add_library(celebrant STATIC src/order_book.cpp src/codec.cpp src/engine.cpp src/engine_runner.cpp src/gateway.cpp src/connection.cpp)
+add_library(celebrant STATIC src/order_book.cpp src/codec.cpp src/sbe_codec.cpp src/engine.cpp src/engine_runner.cpp src/gateway.cpp src/connection.cpp)
 target_include_directories(celebrant PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # generated SBE headers: built before celebrant compiles, put on private include path
 add_dependencies(celebrant sbe_codegen)

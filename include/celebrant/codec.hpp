@@ -33,6 +33,9 @@ using DecodeOutcome = Expected<std::variant<NewOrder, OrderKey>, ParseError>;
 
 struct Ack {
     OrderId id;
+    Symbol symbol;
+    Side side;
+    Quantity leaves_qty;
 };
 
 struct Reject {
